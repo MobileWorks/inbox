@@ -252,7 +252,7 @@ def default_account(db):
 @fixture(scope='function')
 def contact_sync(config, db):
     from inbox.contacts.remote_sync import ContactSync
-    return ContactSync('gmail', 1, 1)
+    return ContactSync('gmail', 1, 1, poll_frequency=0)
 
 
 @fixture(scope='function')
