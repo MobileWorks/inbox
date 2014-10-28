@@ -5,7 +5,7 @@ from setproctitle import setproctitle
 
 from sqlalchemy import func, or_, and_
 
-from inbox.providers import providers, provider_info
+from inbox.providers import providers
 from inbox.config import config
 from inbox.contacts.remote_sync import ContactSync
 from inbox.events.remote_sync import EventSync
@@ -14,6 +14,7 @@ from inbox.models.session import session_scope
 from inbox.models import Account
 from inbox.util.concurrency import retry_with_logging
 from inbox.util.debug import attach_profiler
+from inbox.util.rdb import break_to_interpreter
 
 from inbox.mailsync.backends import module_registry
 
@@ -59,6 +60,17 @@ class SyncService(object):
             # This slows things down so you probably don't want to do it
             # normally.
             attach_profiler()
+
+        if config.get('DEBUG_CONSOLE_ON'):
+            # Enable the debugging console if this flag is set. Connect to
+            # localhost on port $PID to get access to a REPL
+            port = None
+            start_port = config.get('DEBUG_START_PORT')
+            if start_port:
+                port = start_port + self.cpu_id
+
+            gevent.spawn(break_to_interpreter, port=port)
+
         setproctitle('inbox-sync-{}'.format(self.cpu_id))
         retry_with_logging(self._run_impl, self.log)
 
@@ -160,7 +172,7 @@ class SyncService(object):
                     self.monitors[acc.id] = monitor
                     monitor.start()
 
-                    info = provider_info(acc.provider, acc.email_address)
+                    info = acc.provider_info
                     if info.get('contacts', None):
                         contact_sync = ContactSync(acc.provider, acc.id,
                                                    acc.namespace.id)
